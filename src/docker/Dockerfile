@@ -3,6 +3,7 @@ FROM python:3.12-slim
 # Accept user-related arguments from the build context
 ARG USER_ID
 ARG USER_NAME
+ARG MODEL_TYPE
 
 # Set user-related environment variables
 
@@ -75,7 +76,7 @@ RUN python3.12 -m venv ${VIRTUAL_ENV} \
 COPY . /app/
 
 # Expose the application's port
-EXPOSE 8080
+EXPOSE 8081
 
 # Start the container
 #CMD ["tail", "-f", "/dev/null"]

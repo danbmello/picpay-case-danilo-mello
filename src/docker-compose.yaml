@@ -11,10 +11,12 @@ services:
       args:
         USER_NAME: "${USER_NAME}"
         USER_ID: "${USER_ID}"
+    environment:
+      MODEL_TYPE: "${MODEL_TYPE:-pyspark}"
     volumes:
       - ./:/app/
     ports:
-      - 8080:8080
+      - 8081:8080
     ipc: host
     init: true
 
