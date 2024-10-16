@@ -1,0 +1,27 @@
+# Ignore specific files
+case-tecnico-mle.pdf
+Dockerfile_bckup.txt
+requirements.txt
+
+# Ignore virtual environment and related files
+picpay_env/
+
+# Ignore data and model files
+airport_coordinates.csv
+airports-database.zip
+model_params.pkl
+airport_data_with_id.csv 
+df_final.csv
+model.pkl
+wind_speed.csv
+
+# Ignore directories and folders
+data/
+models/
+spark-warehouse/
+airports-database/
+
+# Ignore Python cache and Jupyter checkpoints
+**/.pytest_cache/
+**/.ipynb_checkpoints/
+**/__pycache__/
