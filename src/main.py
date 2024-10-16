@@ -11,22 +11,14 @@ from pydantic import BaseModel
 import numpy as np
 import pandas as pd
 
-
-#import findspark
-
-#findspark.init('/opt/spark')
-
 # Import Spark modules
 from pyspark.sql import SparkSession
-from pyspark.ml.regression import LinearRegressionModel
 from pyspark.ml import PipelineModel
-from pyspark.ml.feature import VectorAssembler
 
 # Initialize Spark session
 spark = SparkSession.builder \
     .appName("FlightDelayPredictionAPI") \
     .getOrCreate()
-#    .config("spark.jars", "/path/to/spark-jar-files") \
 
 # Set Spark logging level to reduce verbosity
 spark.sparkContext.setLogLevel("ERROR")
@@ -35,19 +27,25 @@ spark.sparkContext.setLogLevel("ERROR")
 async def lifespan(app: FastAPI):
     global model
     model_type = os.getenv('MODEL_TYPE', 'pyspark')
-    if model_type == 'pyspark':
-        model_path = "./model/lr_model_pyspark"
-        model = PipelineModel.load(model_path)
-        print("PySpark PipelineModel loaded successfully.")
-    elif model_type == 'pickle':
-        model_path = "./model/lr_model.pkl"
-        with open(model_path, 'rb') as file:
-            model = pickle.load(file)
-        print("Pickle PipelineModel loaded successfully.")
-    else:
-        raise ValueError(f"Unknown MODEL_TYPE: {model_type}")
+    model = None
+    try:
+        if model_type == 'pyspark':
+            model_path = "./models/lr_model_pyspark"
+            model = PipelineModel.load(model_path)
+            print("PySpark PipelineModel loaded successfully.")
+        elif model_type == 'pickle':
+            model_path = "./models/lr_model.pkl"
+            with open(model_path, 'rb') as file:
+                model = pickle.load(file)
+            print("Pickle model loaded successfully.")
+        else:
+            print(f"Unknown MODEL_TYPE: {model_type}")
+    except Exception as e:
+        print(f"Error loading model: {e}")
+    
     yield
     print("Application is shutting down.")
+
     
 app = FastAPI(lifespan=lifespan)
 
@@ -63,24 +61,16 @@ class FlightData(BaseModel):
     distance: float
     carrier: str
 
-# Purpose:
-
-# Health checks are commonly used in web services and applications to determine if the application is running properly and can respond to requests.
-# This specific endpoint returns a simple response ({"status": "ok"}) when the service is healthy, meaning the server is up and running.
-
-# How to use it:
-
-# You or an automated system (such as a load balancer, monitoring service, or orchestration platform) can send a GET request to /health to verify that the API is operational.
-
 @app.get("/health", status_code=200, tags=["health"], summary="Health check")
 async def health():
     return {"status": "ok"}
 
 @app.post("/model/predict/")
 async def predict(data: FlightData):
-    if model is None:
-        raise HTTPException(status_code=400, detail="Service Temporarily Unavailable! Please try again later.")
-    
+        
+    print(f"Received data: {data}")
+    print(f"Parsed as: {data.dict()}")
+
     # Prepare input features for prediction
     input_data = {
         'dep_delay': data.dep_delay,
@@ -91,28 +81,30 @@ async def predict(data: FlightData):
     }
 
     model_type = os.getenv('MODEL_TYPE', 'pyspark')
-
+    
+    print(f"Imprimindo MODEL_TYPE: {model_type == 'pyspark'}")
+    print(model)
+    
     if model_type == 'pyspark':
-        # Create a DataFrame with the input data for PySpark
-        input_df = spark.createDataFrame([input_data])
-        
-        # Make the prediction using the loaded PySpark model
-        prediction = model.transform(input_df)
-        
-        # Extract prediction result
-        predicted_value = prediction.collect()[0]['prediction']
+        try:
+            input_df = spark.createDataFrame([input_data])
+            prediction = model.transform(input_df)
+            predicted_value = prediction.collect()[0]['prediction']
+        except Exception as e:
+            print(f"PySpark prediction error: {e}")
+            raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
     
     elif model_type == 'pickle':
-        # Convert the input data to a pandas DataFrame
-        df_input = pd.DataFrame([input_data])
-        
-        # Make the prediction using the loaded pickle model
-        predicted_value = model.predict(df_input)[0]
+        try:
+            df_input = pd.DataFrame([input_data])
+            predicted_value = model.predict(df_input)[0]
+        except Exception as e:
+            print(f"Pickle prediction error: {e}")
+            raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
     
     else:
         raise HTTPException(status_code=400, detail=f"Unknown model type: {model_type}")
 
-    # Store the input data and prediction in the history
     prediction_history.append({
         "input": input_data,
         "prediction": predicted_value
@@ -122,24 +114,10 @@ async def predict(data: FlightData):
 
 @app.get("/model/history/", tags=["model"], summary="Prediction history")
 async def get_history():
-    # Encode the prediction history into JSON-compatible data
     json_history = jsonable_encoder({"history": prediction_history})
-    
-    # Convert the JSON-compatible data into a formatted JSON string with indentation
     formatted_history = json.dumps(json_history, indent=2)
-    
-    # Return the formatted JSON string as a response with application/json content type
     return Response(content=formatted_history, media_type="application/json")
 
-# How to use it:
-# You can use these operations to manage user data, storing and retrieving information through API calls in your FastAPI application. Here’s how you could use each:
-
-# To insert users, send a POST request with user information.
-# To get user information, send a GET request with the user's name.
-# To list all users, send a GET request to list the stored users.
-# If you're building an application where you need to handle user information, these APIs provide a foundation for user-related operations. However, currently, the database is in-memory, meaning any stored data will be lost once the application is restarted. For persistent data storage, you'd replace InMemoryDatabase with an actual database, like MongoDB or PostgreSQL.
-
-# User operations (remains unchanged)
 @app.post("/user/", tags=["example"], summary="Insert user")
 async def insert(data: dict):
     db = InMemoryDatabase()
@@ -164,6 +142,6 @@ async def list():
     formatted_users = json.dumps(json_users, indent=4)
     return Response(content=formatted_users, media_type="application/json")
 
-
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8080, log_level="info")
+

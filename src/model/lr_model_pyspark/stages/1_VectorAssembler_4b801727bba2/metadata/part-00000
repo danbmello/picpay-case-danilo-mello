@@ -1,1 +1,0 @@
-{"class":"org.apache.spark.ml.feature.VectorAssembler","timestamp":1729099831175,"sparkVersion":"3.5.3","uid":"VectorAssembler_4b801727bba2","paramMap":{"outputCol":"features","inputCols":["dep_delay","origin_wind_speed","dest_wind_speed","distance","carrier_index"]},"defaultParamMap":{"handleInvalid":"error","outputCol":"VectorAssembler_4b801727bba2__output"}}

@@ -1,0 +1,17 @@
+# Ignore everything by default
+*
+
+# Explicitly include the necessary directories and files
+!docker
+!models
+!src
+!tests
+!pyproject.toml
+!poetry.lock
+
+# Ensure the contents of the included directories are also included
+!docker/**/*
+!models/**/*
+!src/**/*
+!tests/**/*
+

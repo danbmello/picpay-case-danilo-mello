@@ -1,18 +1,25 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
+from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
+import json
+from contextlib import asynccontextmanager
 from database import InMemoryDatabase
 import uvicorn
 import pickle
 import os
 from pydantic import BaseModel
 import numpy as np
+import pandas as pd
 
-import findspark
 
-findspark.init('/opt/spark')
+#import findspark
+
+#findspark.init('/opt/spark')
 
 # Import Spark modules
 from pyspark.sql import SparkSession
 from pyspark.ml.regression import LinearRegressionModel
+from pyspark.ml import PipelineModel
 from pyspark.ml.feature import VectorAssembler
 
 # Initialize Spark session
@@ -21,10 +28,41 @@ spark = SparkSession.builder \
     .getOrCreate()
 #    .config("spark.jars", "/path/to/spark-jar-files") \
 
-app = FastAPI()
+# Set Spark logging level to reduce verbosity
+spark.sparkContext.setLogLevel("ERROR")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global model
+    model_type = os.getenv('MODEL_TYPE', 'pyspark')
+    if model_type == 'pyspark':
+        try:
+            model_path = "./model/lr_model_pyspark"
+            model = PipelineModel.load(model_path)
+            print("PySpark PipelineModel loaded successfully.")
+        except Exception as e:
+            print(f"Error loading PySpark model: {e}")
+            model = None
+    elif model_type == 'pickle':
+        try:
+            model_path = "./model/lr_model.pkl"
+            with open(model_path, 'rb') as file:
+                model = pickle.load(file)
+            print("Pickle model loaded successfully.")
+        except Exception as e:
+            print(f"Error loading Pickle model: {e}")
+            model = None
+    else:
+        print(f"Unknown MODEL_TYPE: {model_type}")
+        model = None
+    
+    yield
+    print("Application is shutting down.")
+    
+app = FastAPI(lifespan=lifespan)
 
 # Store the model and prediction history in memory
-lr_model = None
+model = None
 prediction_history = []
 
 # Define the input structure for predictions
@@ -33,7 +71,7 @@ class FlightData(BaseModel):
     origin_wind_speed: float
     dest_wind_speed: float
     distance: float
-    carrier_index: float
+    carrier: str
 
 # Purpose:
 
@@ -48,47 +86,45 @@ class FlightData(BaseModel):
 async def health():
     return {"status": "ok"}
 
-# Load the model properly in /model/load/ route
-@app.post("/model/load/")
-async def load_model():
-    global lr_model
-    model_path = "/home/dbmello/Documents/case-machine-learning-engineer-pleno/src/model/lr_model_pyspark"
-    
-    lr_model = LinearRegressionModel.load(model_path)
-    
-    return {"status": "Model loaded successfully"}
-
-# Correct predict function
 @app.post("/model/predict/")
-async def predict(data: dict):
-    if lr_model is None:
-        raise HTTPException(status_code=400, detail="Model is not loaded")
+async def predict(data: FlightData):
+    if model is None:
+        raise HTTPException(status_code=400, detail="Service Temporarily Unavailable! Please try again later.")
     
     # Prepare input features for prediction
-    input_data = [
-        data['dep_delay'],
-        data['origin_wind_speed'],
-        data['dest_wind_speed'],
-        data['distance'],
-        data['carrier_index']
-    ]
+    input_data = {
+        'dep_delay': data.dep_delay,
+        'origin_wind_speed': data.origin_wind_speed,
+        'dest_wind_speed': data.dest_wind_speed,
+        'distance': data.distance,
+        'carrier': data.carrier
+    }
 
-    # Create a DataFrame with the input data
-    input_df = spark.createDataFrame([input_data], ['dep_delay', 'origin_wind_speed', 'dest_wind_speed', 'distance', 'carrier_index'])
-    
-    # Use VectorAssembler to create a 'features' column
-    assembler = VectorAssembler(inputCols=['dep_delay', 'origin_wind_speed', 'dest_wind_speed', 'distance', 'carrier_index'], outputCol="features")
-    input_df = assembler.transform(input_df)
+    model_type = os.getenv('MODEL_TYPE', 'pyspark')
 
-    # Make the prediction using the loaded PySpark model
-    prediction = lr_model.transform(input_df)
+    if model_type == 'pyspark':
+        # Create a DataFrame with the input data for PySpark
+        input_df = spark.createDataFrame([input_data])
+        
+        # Make the prediction using the loaded PySpark model
+        prediction = model.transform(input_df)
+        
+        # Extract prediction result
+        predicted_value = prediction.collect()[0]['prediction']
     
-    # Extract prediction result
-    predicted_value = prediction.collect()[0]['prediction']
+    elif model_type == 'pickle':
+        # Convert the input data to a pandas DataFrame
+        df_input = pd.DataFrame([input_data])
+        
+        # Make the prediction using the loaded pickle model
+        predicted_value = model.predict(df_input)[0]
+    
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown model type: {model_type}")
 
     # Store the input data and prediction in the history
     prediction_history.append({
-        "input": data,
+        "input": input_data,
         "prediction": predicted_value
     })
 
@@ -96,7 +132,14 @@ async def predict(data: dict):
 
 @app.get("/model/history/", tags=["model"], summary="Prediction history")
 async def get_history():
-    return {"history": prediction_history}
+    # Encode the prediction history into JSON-compatible data
+    json_history = jsonable_encoder({"history": prediction_history})
+    
+    # Convert the JSON-compatible data into a formatted JSON string with indentation
+    formatted_history = json.dumps(json_history, indent=2)
+    
+    # Return the formatted JSON string as a response with application/json content type
+    return Response(content=formatted_history, media_type="application/json")
 
 # How to use it:
 # You can use these operations to manage user data, storing and retrieving information through API calls in your FastAPI application. Here’s how you could use each:
@@ -119,14 +162,18 @@ async def get(name: str):
     db = InMemoryDatabase()
     users = db.get_collection('users')
     user = users.find_one({"name": name})
-    return {"status": "ok", "user": user}
+    json_user = jsonable_encoder({"status": "ok", "user": user})
+    formatted_user = json.dumps(json_user, indent=4)
+    return Response(content=formatted_user, media_type="application/json")
 
 @app.get("/user/", tags=["example"], summary="List all users")
 async def list():
     db = InMemoryDatabase()
     users = db.get_collection('users')
-    return {"status": "ok", "users": [x for x in users.find({}, {"_id": 0})]}
+    json_users = jsonable_encoder({"status": "ok", "users": [x for x in users.find({}, {"_id": 0})]})
+    formatted_users = json.dumps(json_users, indent=4)
+    return Response(content=formatted_users, media_type="application/json")
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8080, log_level="debug")
+    uvicorn.run(app, host="0.0.0.0", port=8080, log_level="info")
