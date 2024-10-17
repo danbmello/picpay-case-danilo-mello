@@ -26,7 +26,8 @@ spark.sparkContext.setLogLevel("ERROR")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global model
-    model_type = os.getenv("MODEL_TYPE", "pyspark")  # Get the model type from environment variables
+    # Get the model type from environment variables
+    model_type = os.getenv("MODEL_TYPE", "pyspark")
     model = None
     try:
         if model_type == "pyspark":
@@ -38,13 +39,17 @@ async def lifespan(app: FastAPI):
             with open(model_path, "rb") as file:
                 model = pickle.load(file)
             print("Pickle model loaded successfully.")
+        # Handle unknown model types
         else:
-            print(f"Unknown MODEL_TYPE: {model_type}")  # Handle unknown model types
+            print(f"Unknown MODEL_TYPE: {model_type}")
     except Exception as e:
-        print(f"Error loading model: {e}")  # Log any errors that occur during model loading
+        # Log any errors that occur during model loading
+        print(f"Error loading model: {e}")
 
-    yield  # Yield control to the application during runtime
-    print("Application is shutting down.")  # Log when the application is closing
+    # Yield control to the application during runtime
+    yield
+    # Log when the application is closing
+    print("Application is shutting down.")
 
 
 # Initialize FastAPI app with the lifespan context
@@ -83,42 +88,55 @@ async def predict(data: FlightData):
         "carrier": data.carrier,
     }
 
-    model_type = os.getenv("MODEL_TYPE", "pyspark")  # Determine which model type to use
+    # Determine which model type to use
+    model_type = os.getenv("MODEL_TYPE", "pyspark")
 
     # Use the PySpark model for prediction
     if model_type == "pyspark":
         try:
-            input_df = spark.createDataFrame([input_data])  # Create a Spark DataFrame from the input data
-            prediction = model.transform(input_df)  # Use the PySpark model to transform (predict) the data
-            predicted_value = prediction.collect()[0]["prediction"]  # Extract the prediction result
+            # Create a Spark DataFrame from the input data
+            input_df = spark.createDataFrame([input_data])
+            # Use the PySpark model to transform (predict) the data
+            prediction = model.transform(input_df)
+            # Extract the prediction result
+            predicted_value = prediction.collect()[0]["prediction"]
         except Exception as e:
-            print(f"PySpark prediction error: {e}")  # Log errors if prediction fails
+            # Log errors if prediction fails
+            print(f"PySpark prediction error: {e}")
             raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
 
     # Use the Pickle model for prediction
     elif model_type == "pickle":
         try:
-            df_input = pd.DataFrame([input_data])  # Create a Pandas DataFrame from the input data
-            predicted_value = model.predict(df_input)[0]  # Use the Pickle model to predict
+            # Create a Pandas DataFrame from the input data
+            df_input = pd.DataFrame([input_data])
+            # Use the Pickle model to predict
+            predicted_value = model.predict(df_input)[0]
         except Exception as e:
-            print(f"Pickle prediction error: {e}")  # Log errors if prediction fails
+            # Log errors if prediction fails
+            print(f"Pickle prediction error: {e}")
             raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
 
     else:
-        raise HTTPException(status_code=400, detail=f"Unknown model type: {model_type}")  # Handle unknown model types
+        # Handle unknown model types
+        raise HTTPException(status_code=400, detail=f"Unknown model type: {model_type}")
 
     # Store the input data and the prediction result in memory
     prediction_history.append({"input": input_data, "prediction": predicted_value})
 
-    return {"prediction": predicted_value}  # Return the prediction result
+    # Return the prediction result
+    return {"prediction": predicted_value}
 
 
 # Endpoint to retrieve the prediction history
 @app.get("/model/history/", tags=["model"], summary="Prediction history")
 async def get_history():
-    json_history = jsonable_encoder({"history": prediction_history})  # Encode the prediction history to JSON format
-    formatted_history = json.dumps(json_history, indent=2)  # Format the JSON with indentation
-    return Response(content=formatted_history, media_type="application/json")  # Return the formatted history
+    # Encode the prediction history to JSON format
+    json_history = jsonable_encoder({"history": prediction_history})
+    # Format the JSON with indentation
+    formatted_history = json.dumps(json_history, indent=2)
+    # Return the formatted history
+    return Response(content=formatted_history, media_type="application/json")
 
 
 # Example endpoint to insert a user into an in-memory database
@@ -126,7 +144,8 @@ async def get_history():
 async def insert(data: dict):
     db = InMemoryDatabase()
     users = db.get_collection("users")
-    users.insert_one(data)  # Insert the provided user data into the database
+    # Insert the provided user data into the database
+    users.insert_one(data)
     return {"status": "ok"}
 
 
@@ -135,10 +154,15 @@ async def insert(data: dict):
 async def get(name: str):
     db = InMemoryDatabase()
     users = db.get_collection("users")
-    user = users.find_one({"name": name})  # Find the user in the database by name
-    json_user = jsonable_encoder({"status": "ok", "user": user})  # Encode the user data as JSON
-    formatted_user = json.dumps(json_user, indent=4)  # Format the JSON with indentation
-    return Response(content=formatted_user, media_type="application/json")  # Return the user data
+    # Find the user in the database by name
+    user = users.find_one({"name": name})
+    # Encode the user data as JSON
+    json_user = jsonable_encoder({"status": "ok", "user": user})
+    # Format the JSON with indentation
+    formatted_user = json.dumps(json_user, indent=4)
+
+    # Return the user data
+    return Response(content=formatted_user, media_type="application/json")
 
 
 # Endpoint to list all users in the in-memory database
@@ -146,13 +170,16 @@ async def get(name: str):
 async def list():
     db = InMemoryDatabase()
     users = db.get_collection("users")
-    json_users = jsonable_encoder(
-        {"status": "ok", "users": [x for x in users.find({}, {"_id": 0})]}
-    )  # Encode all users as JSON
-    formatted_users = json.dumps(json_users, indent=4)  # Format the JSON with indentation
-    return Response(content=formatted_users, media_type="application/json")  # Return the list of users
+    # Encode all users as JSON
+    json_users = jsonable_encoder({"status": "ok", "users": [x for x in users.find({}, {"_id": 0})]})
+    # Format the JSON with indentation
+    formatted_users = json.dumps(json_users, indent=4)
+
+    # Return the list of users
+    return Response(content=formatted_users, media_type="application/json")
 
 
 # Entry point for running the FastAPI app
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8080, log_level="info")  # Run the app on port 8080 using Uvicorn
+    # Run the app on port 8080 using Uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8080, log_level="info")
