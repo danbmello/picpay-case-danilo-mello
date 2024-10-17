@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from pyspark.ml import PipelineModel
 from pyspark.sql import SparkSession
 
-from database import InMemoryDatabase
+from src.database import InMemoryDatabase
 
 # Initialize Spark session for working with PySpark
 spark = SparkSession.builder.appName("FlightDelayPredictionAPI").getOrCreate()

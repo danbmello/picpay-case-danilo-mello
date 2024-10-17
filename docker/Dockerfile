@@ -83,9 +83,6 @@ RUN python3.12 -m venv ${VIRTUAL_ENV} \
     && cp poetry.lock ${BUILD_POETRY_LOCK} \  
     && rm -rf ${HOME}/.cache/*  
 
-# Copy the rest of the application code to the container
-COPY . /app/
-
 # Expose port 8081 for the application
 EXPOSE 8080
 

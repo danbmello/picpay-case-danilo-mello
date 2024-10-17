@@ -20,9 +20,6 @@ LOCAL_DOCKER_IMAGE_NAME = picpay-docker-image
 
 DIRS_TO_VALIDATE ?= src
 
-# Returns true if the stem is a non-empty environment variable, or else raises an error.
-guard-%:
-	@#$(or ${$*}, $(error $* is not set))
 
 ## Builds docker image
 build:
@@ -88,6 +85,10 @@ check-type-annotations: up
 full-check: lint check-type-annotations
 	$(DOCKER_COMPOSE_EXEC) pytest --cov --cov-report xml --verbose
 
+# Returns true if the stem is a non-empty environment variable, or else raises an error.
+guard-%:
+	@#$(or ${$*}, $(error $* is not set))
+	
 .DEFAULT_GOAL := help
 
 # Inspired by <http://marmelab.com/blog/2016/02/29/auto-documented-makefile.html>

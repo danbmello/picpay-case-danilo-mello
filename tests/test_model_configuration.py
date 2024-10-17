@@ -4,7 +4,7 @@ import pytest
 
 from fastapi.testclient import TestClient
 
-from main import app, lifespan
+from src.main import app, lifespan
 
 # Initialize the test client for the FastAPI app
 client = TestClient(app)

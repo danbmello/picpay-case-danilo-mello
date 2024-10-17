@@ -24,7 +24,9 @@ services:
       MODEL_TYPE: "${MODEL_TYPE:-pyspark}"  
     # Mount the current directory to /app inside the container
     volumes:
-      - ./:/app/
+      - ./src/:/app/src/
+      - ./tests/:/app/tests/
+      - ./models/:/app/models/
     # Map the host port 8081 to the container port 8080
     ports:
       - 8080:8080
