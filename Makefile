@@ -18,46 +18,11 @@ DOCKER_COMPOSE_EXEC = $(DOCKER_COMPOSE_COMMAND) exec $(SERVICE_NAME)
 # Local docker image name
 LOCAL_DOCKER_IMAGE_NAME = picpay-docker-image
 
-DIRS_TO_VALIDATE = src
+DIRS_TO_VALIDATE ?= src
 
 # Returns true if the stem is a non-empty environment variable, or else raises an error.
 guard-%:
 	@#$(or ${$*}, $(error $* is not set))
-
-## Sort code using isort
-sort: up
-	$(DOCKER_COMPOSE_EXEC) isort --atomic $(DIRS_TO_VALIDATE)
-
-## Check sorting using isort
-sort-check: up
-	$(DOCKER_COMPOSE_EXEC) isort --check-only --atomic $(DIRS_TO_VALIDATE)
-
-## Format code using black
-format: up
-	$(DOCKER_COMPOSE_EXEC) black $(DIRS_TO_VALIDATE)
-
-## Check format using black
-format-check: up
-	$(DOCKER_COMPOSE_EXEC) black --check $(DIRS_TO_VALIDATE)
-
-## Format and sort code using black and isort
-format-and-sort: sort format
-
-## Lint code using flake8
-lint: up format-check sort-check
-	$(DOCKER_COMPOSE_EXEC) flake8 $(DIRS_TO_VALIDATE)
-
-## Check type annotations using mypy
-check-type-annotations: up
-	$(DOCKER_COMPOSE_EXEC) mypy $(DIRS_TO_VALIDATE)
-
-## Run tests with pytest
-test: up
-	$(DOCKER_COMPOSE_EXEC) pytest ./tests/
-
-## Perform a full check
-full-check: lint check-type-annotations
-	$(DOCKER_COMPOSE_EXEC) pytest --cov --cov-report xml --verbose
 
 ## Builds docker image
 build:
@@ -87,6 +52,41 @@ down:
 ## Open an interactive shell in docker container
 exec-in: up
 	docker exec -it $(CONTAINER_NAME) bash
+
+## Run tests with pytest
+test: up
+	$(DOCKER_COMPOSE_EXEC) pytest ./tests/
+	
+## Sort code using isort
+sort: up
+	$(DOCKER_COMPOSE_EXEC) isort --atomic $(DIRS_TO_VALIDATE)
+
+## Check sorting using isort
+sort-check: up
+	$(DOCKER_COMPOSE_EXEC) isort --check-only --atomic $(DIRS_TO_VALIDATE)
+
+## Format code using black
+format: up
+	$(DOCKER_COMPOSE_EXEC) black $(DIRS_TO_VALIDATE)
+
+## Check format using black
+format-check: up
+	$(DOCKER_COMPOSE_EXEC) black --check $(DIRS_TO_VALIDATE)
+
+## Format and sort code using black and isort
+format-and-sort: sort format
+
+## Lint code using flake8
+lint: up format-check sort-check
+	$(DOCKER_COMPOSE_EXEC) flake8 $(DIRS_TO_VALIDATE)
+
+## Check type annotations using mypy
+check-type-annotations: up
+	$(DOCKER_COMPOSE_EXEC) mypy $(DIRS_TO_VALIDATE)
+
+## Perform a full check
+full-check: lint check-type-annotations
+	$(DOCKER_COMPOSE_EXEC) pytest --cov --cov-report xml --verbose
 
 .DEFAULT_GOAL := help
 

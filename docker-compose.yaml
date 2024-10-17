@@ -1,22 +1,35 @@
 services:
   app:
+    # Set the user and hostname for the container using the USER_ID and HOST_NAME environment variable
     user: "${USER_ID}"
-    hostname: "${HOST_NAME}"
+    hostname: "${HOST_NAME}"    
+    # Specify the Docker image to use for the service
     image: picpay-docker-image:latest
+    # Set the platform to ensure compatibility with linux/amd64 architecture
     platform: linux/amd64
+    # Name the container 'picpay-container'
     container_name: picpay-container
+    # Build configuration for the image
     build:
+      # Set the build context to the current directory
       context: .
+      # Specify the Dockerfile location
       dockerfile: ./docker/Dockerfile
+      # Pass build-time arguments for the Dockerfile
       args:
-        USER_NAME: "${USER_NAME}"
-        USER_ID: "${USER_ID}"
+        USER_NAME: "${USER_NAME}"  # User name passed as an argument to the Dockerfile
+        USER_ID: "${USER_ID}"  # User ID passed as an argument to the Dockerfile
+    # Define environment variables to be used by the container
     environment:
-      MODEL_TYPE: "${MODEL_TYPE:-pyspark}"
+      MODEL_TYPE: "${MODEL_TYPE:-pyspark}"  
+    # Mount the current directory to /app inside the container
     volumes:
       - ./:/app/
+    # Map the host port 8081 to the container port 8080
     ports:
-      - 8081:8080
+      - 8080:8080
+    # Set the inter-process communication mode to host, enabling shared memory access
     ipc: host
+    # Ensure that the container's init system is started
     init: true
 
