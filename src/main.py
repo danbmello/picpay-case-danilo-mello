@@ -26,15 +26,13 @@ spark.sparkContext.setLogLevel("ERROR")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global model
-    model_type = os.getenv("MODEL_TYPE", "pyspark")  # Get the model type (PySpark or Pickle) from environment variables
+    model_type = os.getenv("MODEL_TYPE", "pyspark")  # Get the model type from environment variables
     model = None
     try:
-        # Load PySpark model if 'MODEL_TYPE' is set to 'pyspark'
         if model_type == "pyspark":
             model_path = "./models/lr_model_pyspark"
             model = PipelineModel.load(model_path)
             print("PySpark PipelineModel loaded successfully.")
-        # Load Pickle model if 'MODEL_TYPE' is set to 'pickle'
         elif model_type == "pickle":
             model_path = "./models/lr_model.pkl"
             with open(model_path, "rb") as file:
