@@ -1,4 +1,6 @@
 # Make all targets .PHONY
+# This command extracts all targets from the Makefile, filtering out non-target lines (like comments or variables),
+#   and only printing the actual target names.
 .PHONY: $(shell sed -n -e '/^$$/ { n ; /^[^ .\#][^ ]*:/ { s/:.*$$// ; p ; } ; }' $(MAKEFILE_LIST))
 
 SHELL = /bin/bash
@@ -19,7 +21,6 @@ DOCKER_COMPOSE_EXEC = $(DOCKER_COMPOSE_COMMAND) exec $(SERVICE_NAME)
 LOCAL_DOCKER_IMAGE_NAME = picpay-docker-image
 
 DIRS_TO_VALIDATE ?= src
-
 
 ## Builds docker image
 build:

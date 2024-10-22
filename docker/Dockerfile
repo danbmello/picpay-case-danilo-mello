@@ -15,7 +15,7 @@ ENV \
     PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
     BUILD_POETRY_LOCK=${HOME}/poetry.lock.build \
-    SPARK_HOME=/opt/spark \  
+    SPARK_HOME=/opt/spark \  S
     JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 
 # Extend the PATH and PYTHONPATH to include Spark and Java binaries
@@ -83,7 +83,7 @@ RUN python3.12 -m venv ${VIRTUAL_ENV} \
     && cp poetry.lock ${BUILD_POETRY_LOCK} \  
     && rm -rf ${HOME}/.cache/*  
 
-# Expose port 8081 for the application
+# Expose port 8080 for the application
 EXPOSE 8080
 
 # Set the default command to run the application
